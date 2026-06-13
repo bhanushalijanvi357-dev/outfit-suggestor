@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StyleSync - Smart Outfit Suggestor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">StyleSync</div>
+            <ul class="nav-menu">
+                <li><a href="#home" class="nav-link">Home</a></li>
+                <li><a href="#" class="nav-link" onclick="showPage('login')">Login</a></li>
+                <li><a href="#" class="nav-link" onclick="showPage('register')">Register</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Home Page -->
+    <div id="home-page" class="page active">
+        <section class="hero">
+            <div class="hero-content">
+                <h1>StyleSync</h1>
+                <p>Your Personal AI Fashion Advisor</p>
+                <p class="hero-subtitle">Get outfit suggestions based on weather, occasion & season</p>
+                <button class="btn btn-primary" onclick="showPage('register')">Get Started</button>
+            </div>
+            <div class="hero-image">
+                <div class="fashion-icon">👔</div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="container">
+                <h2>Why Choose StyleSync?</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>Smart Recommendations</h3>
+                        <p>AI-powered outfit suggestions based on weather, occasion & season</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">👕</div>
+                        <h3>Virtual Wardrobe</h3>
+                        <p>Organize your clothing items and get personalized recommendations</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎨</div>
+                        <h3>Color Matching</h3>
+                        <p>Perfect color combinations for all occasions</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💾</div>
+                        <h3>Save Favorites</h3>
+                        <p>Save your favorite outfit combinations for future reference</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Register Page -->
+    <div id="register-page" class="page">
+        <div class="auth-container">
+            <div class="auth-box">
+                <h2>Create Account</h2>
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="reg-name">Full Name</label>
+                        <input type="text" id="reg-name" placeholder="Enter your name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-email">Email</label>
+                        <input type="email" id="reg-email" placeholder="Enter your email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password">Password</label>
+                        <input type="password" id="reg-password" placeholder="Enter password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-confirm-password">Confirm Password</label>
+                        <input type="password" id="reg-confirm-password" placeholder="Confirm password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+                <p class="auth-switch">Already have account? <a href="#" onclick="showPage('login')">Login here</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div id="login-page" class="page">
+        <div class="auth-container">
+            <div class="auth-box">
+                <h2>Welcome Back</h2>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" placeholder="Enter your email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <p class="auth-switch">Don't have account? <a href="#" onclick="showPage('register')">Register here</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard-page" class="page">
+        <nav class="dashboard-nav">
+            <div class="container">
+                <div class="nav-brand">StyleSync</div>
+                <ul class="nav-menu">
+                    <li><a href="#" class="nav-link active" onclick="showDashboardTab('suggest')">Suggest Outfit</a></li>
+                    <li><a href="#" class="nav-link" onclick="showDashboardTab('wardrobe')">My Wardrobe</a></li>
+                    <li><a href="#" class="nav-link" onclick="showDashboardTab('favorites')">Favorites</a></li>
+                    <li><a href="#" class="nav-link" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Suggestion Tab -->
+        <div id="suggest-tab" class="dashboard-tab active">
+            <div class="container">
+                <h2>Get Outfit Suggestion</h2>
+                <div class="dashboard-grid">
+                    <div class="form-section">
+                        <form id="suggestionForm">
+                            <div class="form-group">
+                                <label for="gender">Gender</label>
+                                <select id="gender" required>
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="unisex">Unisex</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="occasion">Occasion</label>
+                                <select id="occasion" required>
+                                    <option value="">Select Occasion</option>
+                                    <option value="casual">Casual</option>
+                                    <option value="college">College</option>
+                                    <option value="party">Party</option>
+                                    <option value="interview">Interview</option>
+                                    <option value="wedding">Wedding</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="weather">Weather</label>
+                                <select id="weather" required>
+                                    <option value="">Select Weather</option>
+                                    <option value="hot">Hot (30°C+)</option>
+                                    <option value="mild">Mild (20-30°C)</option>
+                                    <option value="cold">Cold (10-20°C)</option>
+                                    <option value="very_cold">Very Cold (Below 10°C)</option>
+                                    <option value="rainy">Rainy</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="season">Season</label>
+                                <select id="season" required>
+                                    <option value="">Select Season</option>
+                                    <option value="summer">Summer</option>
+                                    <option value="monsoon">Monsoon</option>
+                                    <option value="winter">Winter</option>
+                                    <option value="spring">Spring</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="color">Preferred Color</label>
+                                <select id="color" required>
+                                    <option value="">Select Color</option>
+                                    <option value="black">Black</option>
+                                    <option value="white">White</option>
+                                    <option value="blue">Blue</option>
+                                    <option value="red">Red</option>
+                                    <option value="green">Green</option>
+                                    <option value="grey">Grey</option>
+                                    <option value="brown">Brown</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Get Suggestion</button>
+                        </form>
+                    </div>
+
+                    <div id="suggestion-result" class="suggestion-result" style="display: none;">
+                        <h3>Your Outfit Suggestion</h3>
+                        <div class="outfit-card">
+                            <div class="outfit-item">
+                                <div class="item-icon">👕</div>
+                                <div class="item-details">
+                                    <p class="item-type">Top Wear</p>
+                                    <p id="topwear-suggestion" class="item-name">-</p>
+                                </div>
+                            </div>
+                            <div class="outfit-item">
+                                <div class="item-icon">👖</div>
+                                <div class="item-details">
+                                    <p class="item-type">Bottom Wear</p>
+                                    <p id="bottomwear-suggestion" class="item-name">-</p>
+                                </div>
+                            </div>
+                            <div class="outfit-item">
+                                <div class="item-icon">👟</div>
+                                <div class="item-details">
+                                    <p class="item-type">Footwear</p>
+                                    <p id="footwear-suggestion" class="item-name">-</p>
+                                </div>
+                            </div>
+                            <div class="outfit-item">
+                                <div class="item-icon">💍</div>
+                                <div class="item-details">
+                                    <p class="item-type">Accessories</p>
+                                    <p id="accessories-suggestion" class="item-name">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary" onclick="saveFavorite()">Save to Favorites</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wardrobe Tab -->
+        <div id="wardrobe-tab" class="dashboard-tab">
+            <div class="container">
+                <h2>My Wardrobe</h2>
+                <button class="btn btn-primary" onclick="showAddWardrobeModal()">Add Item</button>
+                <div id="wardrobe-list" class="wardrobe-list">
+                    <!-- Wardrobe items will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Favorites Tab -->
+        <div id="favorites-tab" class="dashboard-tab">
+            <div class="container">
+                <h2>Favorite Outfits</h2>
+                <div id="favorites-list" class="favorites-list">
+                    <!-- Favorite outfits will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding wardrobe -->
+    <div id="wardrobeModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeWardrobeModal()">&times;</span>
+            <h2>Add Clothing Item</h2>
+            <form id="addWardrobeForm">
+                <div class="form-group">
+                    <label for="item-type">Type</label>
+                    <select id="item-type" required>
+                        <option value="">Select Type</option>
+                        <option value="shirt">Shirt</option>
+                        <option value="tshirt">T-Shirt</option>
+                        <option value="jeans">Jeans</option>
+                        <option value="pants">Pants</option>
+                        <option value="shoes">Shoes</option>
+                        <option value="jacket">Jacket</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="item-color">Color</label>
+                    <input type="text" id="item-color" placeholder="Enter color" required>
+                </div>
+                <div class="form-group">
+                    <label for="item-brand">Brand</label>
+                    <input type="text" id="item-brand" placeholder="Enter brand" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Item</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
