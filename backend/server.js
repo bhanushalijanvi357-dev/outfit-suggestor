@@ -10,7 +10,10 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:8000', 'http://localhost:3000', 'https://outfit-suggestor-kzmj.vercel.app/'],
+    credentials: true
+}));
 app.use(express.json());
 
 // Data files (no MySQL needed!)
