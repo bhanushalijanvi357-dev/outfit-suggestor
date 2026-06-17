@@ -2,8 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const path = require('path');
+const { MongoClient } = require('mongodb');
 
 dotenv.config();
 
@@ -11,67 +10,32 @@ const app = express();
 
 // Middleware
 app.use(cors({
-       origin: 'https://outfit-suggestor-kzmj.vercel.app',
-       credentials: true
-   }));
+    origin: 'https://outfit-suggestor-kzmj.vercel.app',
+    credentials: true
+}));
 app.use(express.json());
 
-// Data files (no MySQL needed!)
-const dataDir = path.join(__dirname, 'data');
-const usersFile = path.join(dataDir, 'users.json');
-const wardrobeFile = path.join(dataDir, 'wardrobe.json');
-const favoritesFile = path.join(dataDir, 'favorites.json');
+// MongoDB Connection
+const MONGO_URI = process.env.MONGODB_URI;
+let db;
+let usersCollection, wardrobeCollection, favoritesCollection;
 
-// Create data directory if doesn't exist
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir);
-}
+const mongoClient = new MongoClient(MONGO_URI);
 
-// Initialize data files
-function initializeDataFiles() {
-    if (!fs.existsSync(usersFile)) {
-        const initialUsers = [
-            { id: 1, name: 'John Doe', email: 'john@example.com', password: 'password123' },
-            { id: 2, name: 'Jane Smith', email: 'jane@example.com', password: 'password123' }
-        ];
-        fs.writeFileSync(usersFile, JSON.stringify(initialUsers, null, 2));
-    }
-
-    if (!fs.existsSync(wardrobeFile)) {
-        fs.writeFileSync(wardrobeFile, JSON.stringify([], null, 2));
-    }
-
-    if (!fs.existsSync(favoritesFile)) {
-        fs.writeFileSync(favoritesFile, JSON.stringify([], null, 2));
+async function connectDB() {
+    try {
+        await mongoClient.connect();
+        db = mongoClient.db('outfit_suggestor');
+        usersCollection = db.collection('users');
+        wardrobeCollection = db.collection('wardrobe');
+        favoritesCollection = db.collection('favorites');
+        console.log('✅ Connected to MongoDB');
+    } catch (err) {
+        console.error('MongoDB connection error:', err);
     }
 }
 
-initializeDataFiles();
-
-// Helper functions to read/write data
-function readUsers() {
-    return JSON.parse(fs.readFileSync(usersFile, 'utf8'));
-}
-
-function writeUsers(users) {
-    fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
-}
-
-function readWardrobe() {
-    return JSON.parse(fs.readFileSync(wardrobeFile, 'utf8'));
-}
-
-function writeWardrobe(wardrobe) {
-    fs.writeFileSync(wardrobeFile, JSON.stringify(wardrobe, null, 2));
-}
-
-function readFavorites() {
-    return JSON.parse(fs.readFileSync(favoritesFile, 'utf8'));
-}
-
-function writeFavorites(favorites) {
-    fs.writeFileSync(favoritesFile, JSON.stringify(favorites, null, 2));
-}
+connectDB();
 
 // Auth Middleware
 const authenticateToken = (req, res, next) => {
@@ -94,31 +58,27 @@ const authenticateToken = (req, res, next) => {
 // =================== AUTHENTICATION ROUTES ===================
 
 // Register
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
     const { name, email, password } = req.body;
     
     try {
-        const users = readUsers();
+        const existingUser = await usersCollection.findOne({ email });
         
-        // Check if email already exists
-        if (users.some(u => u.email === email)) {
+        if (existingUser) {
             return res.status(400).json({ message: 'Email already exists' });
         }
         
-        // Add new user
         const newUser = {
-            id: Math.max(...users.map(u => u.id), 0) + 1,
             name,
             email,
             password
         };
         
-        users.push(newUser);
-        writeUsers(users);
+        await usersCollection.insertOne(newUser);
         
         res.status(201).json({ 
             message: 'User registered successfully',
-            userId: newUser.id 
+            userId: newUser._id 
         });
     } catch (error) {
         console.error('Register error:', error);
@@ -127,19 +87,18 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // Login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     
     try {
-        const users = readUsers();
-        const user = users.find(u => u.email === email && u.password === password);
+        const user = await usersCollection.findOne({ email, password });
         
         if (!user) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
         
         const token = jwt.sign(
-            { userId: user.id, email: user.email },
+            { userId: user._id.toString(), email: user.email },
             process.env.JWT_SECRET || 'your_secret_key',
             { expiresIn: '7d' }
         );
@@ -147,7 +106,7 @@ app.post('/api/auth/login', (req, res) => {
         res.json({
             message: 'Login successful',
             token,
-            user: { id: user.id, name: user.name, email: user.email }
+            user: { id: user._id, name: user.name, email: user.email }
         });
     } catch (error) {
         console.error('Login error:', error);
@@ -277,19 +236,6 @@ const outfitDatabase = {
                 'winter': { topwear: 'Saree/Lehenga with Shawl', bottomwear: 'Not Applicable', footwear: 'Ethnic Shoes', accessories: 'Jewelry' }
             }
         }
-    },
-    'unisex': {
-        'casual': {
-            'hot': {
-                'summer': { topwear: 'Cotton T-shirt', bottomwear: 'Shorts', footwear: 'Sneakers', accessories: 'Sunglasses' }
-            },
-            'mild': {
-                'spring': { topwear: 'Casual Shirt', bottomwear: 'Jeans', footwear: 'Sneakers', accessories: 'Watch' }
-            },
-            'cold': {
-                'winter': { topwear: 'Hoodie', bottomwear: 'Jeans', footwear: 'Boots', accessories: 'Scarf' }
-            }
-        }
     }
 };
 
@@ -307,24 +253,11 @@ app.post('/api/outfits/suggest', authenticateToken, (req, res) => {
                 footwear: 'Sneakers',
                 accessories: 'Watch'
             };
+        } else {
+            suggestion.topwear = `${color} ${suggestion.topwear.split(' ').pop()}`;
         }
         
-        suggestion.topwear = `${color} ${suggestion.topwear.split(' ').pop()}`;
-        
-        const outfit = {
-            userId: req.user.userId,
-            gender,
-            occasion,
-            weather,
-            season,
-            color,
-            topwear: suggestion.topwear,
-            bottomwear: suggestion.bottomwear,
-            footwear: suggestion.footwear,
-            accessories: suggestion.accessories
-        };
-        
-        res.json({ outfit });
+        res.json({ outfit: suggestion });
     } catch (error) {
         console.error('Suggestion error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -332,14 +265,11 @@ app.post('/api/outfits/suggest', authenticateToken, (req, res) => {
 });
 
 // Save Favorite Outfit
-app.post('/api/outfits/favorites', authenticateToken, (req, res) => {
+app.post('/api/outfits/favorites', authenticateToken, async (req, res) => {
     const { gender, occasion, weather, season, color, topwear, bottomwear, footwear, accessories } = req.body;
     
     try {
-        const favorites = readFavorites();
-        
         const newFavorite = {
-            id: Math.max(...favorites.map(f => f.id || 0), 0) + 1,
             user_id: req.user.userId,
             occasion,
             weather,
@@ -351,12 +281,11 @@ app.post('/api/outfits/favorites', authenticateToken, (req, res) => {
             created_at: new Date().toISOString()
         };
         
-        favorites.push(newFavorite);
-        writeFavorites(favorites);
+        const result = await favoritesCollection.insertOne(newFavorite);
         
         res.status(201).json({ 
             message: 'Outfit saved successfully',
-            id: newFavorite.id 
+            id: result.insertedId 
         });
     } catch (error) {
         console.error('Save favorite error:', error);
@@ -365,11 +294,10 @@ app.post('/api/outfits/favorites', authenticateToken, (req, res) => {
 });
 
 // Get Favorite Outfits
-app.get('/api/outfits/favorites', authenticateToken, (req, res) => {
+app.get('/api/outfits/favorites', authenticateToken, async (req, res) => {
     try {
-        const favorites = readFavorites();
-        const userFavorites = favorites.filter(f => f.user_id === req.user.userId);
-        res.json({ favorites: userFavorites });
+        const favorites = await favoritesCollection.find({ user_id: req.user.userId }).toArray();
+        res.json({ favorites });
     } catch (error) {
         console.error('Get favorites error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -377,11 +305,13 @@ app.get('/api/outfits/favorites', authenticateToken, (req, res) => {
 });
 
 // Delete Favorite
-app.delete('/api/outfits/favorites/:id', authenticateToken, (req, res) => {
+app.delete('/api/outfits/favorites/:id', authenticateToken, async (req, res) => {
     try {
-        const favorites = readFavorites();
-        const filtered = favorites.filter(f => !(f.id == req.params.id && f.user_id === req.user.userId));
-        writeFavorites(filtered);
+        const { ObjectId } = require('mongodb');
+        await favoritesCollection.deleteOne({ 
+            _id: new ObjectId(req.params.id),
+            user_id: req.user.userId 
+        });
         res.json({ message: 'Favorite deleted' });
     } catch (error) {
         console.error('Delete favorite error:', error);
@@ -392,11 +322,10 @@ app.delete('/api/outfits/favorites/:id', authenticateToken, (req, res) => {
 // =================== WARDROBE ROUTES ===================
 
 // Get Wardrobe Items
-app.get('/api/wardrobe', authenticateToken, (req, res) => {
+app.get('/api/wardrobe', authenticateToken, async (req, res) => {
     try {
-        const wardrobe = readWardrobe();
-        const userWardrobe = wardrobe.filter(w => w.user_id === req.user.userId);
-        res.json({ items: userWardrobe });
+        const items = await wardrobeCollection.find({ user_id: req.user.userId }).toArray();
+        res.json({ items });
     } catch (error) {
         console.error('Get wardrobe error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -404,14 +333,11 @@ app.get('/api/wardrobe', authenticateToken, (req, res) => {
 });
 
 // Add Wardrobe Item
-app.post('/api/wardrobe', authenticateToken, (req, res) => {
+app.post('/api/wardrobe', authenticateToken, async (req, res) => {
     const { type, color, brand } = req.body;
     
     try {
-        const wardrobe = readWardrobe();
-        
         const newItem = {
-            id: Math.max(...wardrobe.map(w => w.id || 0), 0) + 1,
             user_id: req.user.userId,
             type,
             color,
@@ -419,12 +345,11 @@ app.post('/api/wardrobe', authenticateToken, (req, res) => {
             created_at: new Date().toISOString()
         };
         
-        wardrobe.push(newItem);
-        writeWardrobe(wardrobe);
+        const result = await wardrobeCollection.insertOne(newItem);
         
         res.status(201).json({ 
             message: 'Item added successfully',
-            id: newItem.id 
+            id: result.insertedId 
         });
     } catch (error) {
         console.error('Add item error:', error);
@@ -433,11 +358,13 @@ app.post('/api/wardrobe', authenticateToken, (req, res) => {
 });
 
 // Delete Wardrobe Item
-app.delete('/api/wardrobe/:id', authenticateToken, (req, res) => {
+app.delete('/api/wardrobe/:id', authenticateToken, async (req, res) => {
     try {
-        const wardrobe = readWardrobe();
-        const filtered = wardrobe.filter(w => !(w.id == req.params.id && w.user_id === req.user.userId));
-        writeWardrobe(filtered);
+        const { ObjectId } = require('mongodb');
+        await wardrobeCollection.deleteOne({ 
+            _id: new ObjectId(req.params.id),
+            user_id: req.user.userId 
+        });
         res.json({ message: 'Item deleted' });
     } catch (error) {
         console.error('Delete item error:', error);
@@ -448,6 +375,5 @@ app.delete('/api/wardrobe/:id', authenticateToken, (req, res) => {
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`✅ Server running on http://localhost:${PORT}`);
-    console.log('📝 Using JSON file storage (no MySQL needed!)');
+    console.log(`✅ Server running on port ${PORT}`);
 });
