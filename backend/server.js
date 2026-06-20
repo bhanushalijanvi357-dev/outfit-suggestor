@@ -2,9 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
-const { MongoClient } = require('mongodb');
+const admin = require('firebase-admin');
 
 dotenv.config();
+
+// Initialize Firebase
+const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
+admin.initializeApp({
+    credential: admin.credential.cert(firebaseConfig),
+    projectId: firebaseConfig.project_id
+});
+
+const db = admin.firestore();
 
 const app = express();
 
@@ -14,28 +23,6 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
-
-// MongoDB Connection
-const MONGO_URI = process.env.MONGODB_URI;
-let db;
-let usersCollection, wardrobeCollection, favoritesCollection;
-
-const mongoClient = new MongoClient(MONGO_URI);
-
-async function connectDB() {
-    try {
-        await mongoClient.connect();
-        db = mongoClient.db('outfit_suggestor');
-        usersCollection = db.collection('users');
-        wardrobeCollection = db.collection('wardrobe');
-        favoritesCollection = db.collection('favorites');
-        console.log('✅ Connected to MongoDB');
-    } catch (err) {
-        console.error('MongoDB connection error:', err);
-    }
-}
-
-connectDB();
 
 // Auth Middleware
 const authenticateToken = (req, res, next) => {
@@ -62,23 +49,26 @@ app.post('/api/auth/register', async (req, res) => {
     const { name, email, password } = req.body;
     
     try {
-        const existingUser = await usersCollection.findOne({ email });
+        // Check if email exists
+        const userDoc = await db.collection('users').doc(email).get();
         
-        if (existingUser) {
+        if (userDoc.exists) {
             return res.status(400).json({ message: 'Email already exists' });
         }
         
-        const newUser = {
+        // Create user
+        const userId = `user_${Date.now()}`;
+        await db.collection('users').doc(email).set({
+            id: userId,
             name,
             email,
-            password
-        };
-        
-        await usersCollection.insertOne(newUser);
+            password,
+            createdAt: new Date()
+        });
         
         res.status(201).json({ 
             message: 'User registered successfully',
-            userId: newUser._id 
+            userId 
         });
     } catch (error) {
         console.error('Register error:', error);
@@ -91,14 +81,20 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     
     try {
-        const user = await usersCollection.findOne({ email, password });
+        const userDoc = await db.collection('users').doc(email).get();
         
-        if (!user) {
+        if (!userDoc.exists) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+        
+        const user = userDoc.data();
+        
+        if (user.password !== password) {
             return res.status(401).json({ message: 'Invalid email or password' });
         }
         
         const token = jwt.sign(
-            { userId: user._id.toString(), email: user.email },
+            { userId: user.id, email: user.email },
             process.env.JWT_SECRET || 'your_secret_key',
             { expiresIn: '7d' }
         );
@@ -106,7 +102,7 @@ app.post('/api/auth/login', async (req, res) => {
         res.json({
             message: 'Login successful',
             token,
-            user: { id: user._id, name: user.name, email: user.email }
+            user: { id: user.id, name: user.name, email: user.email }
         });
     } catch (error) {
         console.error('Login error:', error);
@@ -269,8 +265,10 @@ app.post('/api/outfits/favorites', authenticateToken, async (req, res) => {
     const { gender, occasion, weather, season, color, topwear, bottomwear, footwear, accessories } = req.body;
     
     try {
-        const newFavorite = {
-            user_id: req.user.userId,
+        const favoriteId = `fav_${Date.now()}`;
+        
+        await db.collection('users').doc(req.user.email).collection('favorites').doc(favoriteId).set({
+            id: favoriteId,
             occasion,
             weather,
             season,
@@ -278,14 +276,12 @@ app.post('/api/outfits/favorites', authenticateToken, async (req, res) => {
             bottomwear,
             footwear,
             accessories,
-            created_at: new Date().toISOString()
-        };
-        
-        const result = await favoritesCollection.insertOne(newFavorite);
+            createdAt: new Date()
+        });
         
         res.status(201).json({ 
             message: 'Outfit saved successfully',
-            id: result.insertedId 
+            id: favoriteId 
         });
     } catch (error) {
         console.error('Save favorite error:', error);
@@ -296,7 +292,13 @@ app.post('/api/outfits/favorites', authenticateToken, async (req, res) => {
 // Get Favorite Outfits
 app.get('/api/outfits/favorites', authenticateToken, async (req, res) => {
     try {
-        const favorites = await favoritesCollection.find({ user_id: req.user.userId }).toArray();
+        const snapshot = await db.collection('users').doc(req.user.email).collection('favorites').get();
+        const favorites = [];
+        
+        snapshot.forEach(doc => {
+            favorites.push(doc.data());
+        });
+        
         res.json({ favorites });
     } catch (error) {
         console.error('Get favorites error:', error);
@@ -307,11 +309,7 @@ app.get('/api/outfits/favorites', authenticateToken, async (req, res) => {
 // Delete Favorite
 app.delete('/api/outfits/favorites/:id', authenticateToken, async (req, res) => {
     try {
-        const { ObjectId } = require('mongodb');
-        await favoritesCollection.deleteOne({ 
-            _id: new ObjectId(req.params.id),
-            user_id: req.user.userId 
-        });
+        await db.collection('users').doc(req.user.email).collection('favorites').doc(req.params.id).delete();
         res.json({ message: 'Favorite deleted' });
     } catch (error) {
         console.error('Delete favorite error:', error);
@@ -324,7 +322,13 @@ app.delete('/api/outfits/favorites/:id', authenticateToken, async (req, res) => 
 // Get Wardrobe Items
 app.get('/api/wardrobe', authenticateToken, async (req, res) => {
     try {
-        const items = await wardrobeCollection.find({ user_id: req.user.userId }).toArray();
+        const snapshot = await db.collection('users').doc(req.user.email).collection('wardrobe').get();
+        const items = [];
+        
+        snapshot.forEach(doc => {
+            items.push(doc.data());
+        });
+        
         res.json({ items });
     } catch (error) {
         console.error('Get wardrobe error:', error);
@@ -337,19 +341,19 @@ app.post('/api/wardrobe', authenticateToken, async (req, res) => {
     const { type, color, brand } = req.body;
     
     try {
-        const newItem = {
-            user_id: req.user.userId,
+        const itemId = `item_${Date.now()}`;
+        
+        await db.collection('users').doc(req.user.email).collection('wardrobe').doc(itemId).set({
+            id: itemId,
             type,
             color,
             brand,
-            created_at: new Date().toISOString()
-        };
-        
-        const result = await wardrobeCollection.insertOne(newItem);
+            createdAt: new Date()
+        });
         
         res.status(201).json({ 
             message: 'Item added successfully',
-            id: result.insertedId 
+            id: itemId 
         });
     } catch (error) {
         console.error('Add item error:', error);
@@ -360,11 +364,7 @@ app.post('/api/wardrobe', authenticateToken, async (req, res) => {
 // Delete Wardrobe Item
 app.delete('/api/wardrobe/:id', authenticateToken, async (req, res) => {
     try {
-        const { ObjectId } = require('mongodb');
-        await wardrobeCollection.deleteOne({ 
-            _id: new ObjectId(req.params.id),
-            user_id: req.user.userId 
-        });
+        await db.collection('users').doc(req.user.email).collection('wardrobe').doc(req.params.id).delete();
         res.json({ message: 'Item deleted' });
     } catch (error) {
         console.error('Delete item error:', error);
@@ -376,4 +376,5 @@ app.delete('/api/wardrobe/:id', authenticateToken, async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
+    console.log('🔥 Using Firebase Firestore for data storage');
 });
