@@ -1,4 +1,4 @@
-const API_URL = 'https://outfit-suggestor.vercel.app/api';
+const API_URL = 'https://outfit-suggestor--bhanushalijanvi.replit.app';
 let currentUser = null;
 let currentSuggestion = null;
 
